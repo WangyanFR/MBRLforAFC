@@ -8,6 +8,28 @@ from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
+import random
+
+def set_seed(seed):
+    # 设置 Python 的随机种子
+    random.seed(seed)
+    # 设置 NumPy 的随机种子
+    np.random.seed(seed)
+    # 设置 PyTorch 的随机种子
+    torch.manual_seed(seed)
+    # 如果使用 GPU，还需要设置 CUDA 的种子
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    # 确保 PyTorch 的确定性行为（可选，但有助于可重复性）
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# 设置一个固定的种子值，例如 42
+set_seed(42)
+
+
+
 class BCdataset(Dataset):
 
     def __init__(self, in_file, out_file, transform=None):
@@ -33,6 +55,20 @@ class Net(torch.nn.Module):
         self.hidden2 = torch.nn.Linear(n_hidden1,n_hidden2)
         self.hidden3 = torch.nn.Linear(n_hidden2,n_hidden3)
         self.predict = torch.nn.Linear(n_hidden3,n_output)
+        self._initialize_weights()
+
+    def _initialize_weights(self):
+        # 对每一层进行 Xavier 初始化
+        torch.nn.init.xavier_uniform_(self.hidden1.weight)
+        torch.nn.init.zeros_(self.hidden1.bias)
+        torch.nn.init.xavier_uniform_(self.hidden2.weight)
+        torch.nn.init.zeros_(self.hidden2.bias)
+        torch.nn.init.xavier_uniform_(self.hidden3.weight)
+        torch.nn.init.zeros_(self.hidden3.bias)
+        torch.nn.init.xavier_uniform_(self.predict.weight)
+        torch.nn.init.zeros_(self.predict.bias)
+        # torch.nn.init.kaiming_uniform_(self.hidden1.weight, mode='fan_in', nonlinearity='relu')
+        # torch.nn.init.zeros_(self.hidden1.bias)
 
     def forward(self,x):
         x = F.relu(self.hidden1(x))
@@ -45,7 +81,7 @@ class Net(torch.nn.Module):
 def NN_train(train,test,lr,num_iterations):
     device          = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    base_path       = './False/Re100_100episode_False'
+    base_path       = './False/Re100_100episode_False_42'
     Path_to_weights = os.path.join(base_path, 'weight_storage')
     image_path      = os.path.join(base_path, 'image')
     os.makedirs(Path_to_weights, exist_ok=True)
@@ -112,7 +148,7 @@ def NN_train(train,test,lr,num_iterations):
             torch.save(best_model_wts, os.path.join(Path_to_weights, f'NN_weights_best.pth'))
 
         # 定期保存模型和打印信息
-        if epoch % 100 == 0 or epoch == num_iterations - 1:
+        if epoch % 1000 == 0 or epoch == num_iterations - 1:
             print(f'Epoch {epoch}: Train Loss: {epoch_train_loss:.4f}, Test Loss: {epoch_test_loss:.4f}')
             torch.save(model.state_dict(), os.path.join(Path_to_weights, f'NN_weights_step{epoch}.pth'))
 
@@ -124,6 +160,16 @@ def NN_train(train,test,lr,num_iterations):
     plt.legend()
     plt.savefig(os.path.join(image_path, 'InputToLabel_loss_curve.png'))
     plt.close()
+
+        # 新增代码：保存损失数据到文本文件
+    with open(os.path.join(image_path, 'InputToLabel_train_loss.txt'), 'w') as f:
+        for loss in train_loss_list:
+            f.write(f"{loss}\n")  # 每个损失值占一行
+
+    with open(os.path.join(image_path, 'InputToLabel_test_loss.txt'), 'w') as f:
+        for loss in test_loss_list:
+            f.write(f"{loss}\n")
+
 
     # 保存最佳模型权重
     torch.save(best_model_wts, os.path.join(Path_to_weights, 'NN_weights.pth'))
@@ -139,9 +185,10 @@ def read_data():
 def model_train():
 
     inputs, labels = read_data()
+
     test_size      = 0.1
     lr             = 0.0001
-    num_iterations = 10000
+    num_iterations = 20000
 
     inputs_train, inputs_test, labels_train, labels_test = train_test_split(inputs,labels, test_size=0.1, random_state=12315)
     train = BCdataset(inputs_train,labels_train)
@@ -152,11 +199,3 @@ def model_train():
 
 if __name__ == "__main__":
     model_train()
-
-
-
-
-
-
-
-
