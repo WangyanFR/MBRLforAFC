@@ -10,28 +10,30 @@ import matplotlib.pyplot as plt
 
 import random
 
+"""
+Supervised training of a feed-forward neural network.
+
+The network maps from flow-field related features to targets (e.g., next flow
+state) at Re=100. Data is loaded from pre-generated .npy files.
+"""
+
 def set_seed(seed):
-    # 设置 Python 的随机种子
+    """Set random seeds for Python, NumPy and PyTorch."""
     random.seed(seed)
-    # 设置 NumPy 的随机种子
     np.random.seed(seed)
-    # 设置 PyTorch 的随机种子
     torch.manual_seed(seed)
-    # 如果使用 GPU，还需要设置 CUDA 的种子
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
-    # 确保 PyTorch 的确定性行为（可选，但有助于可重复性）
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-# 设置一个固定的种子值，例如 42
 set_seed(42)
 
 
 
 class BCdataset(Dataset):
-
+    """Simple dataset wrapping input and label numpy arrays."""
     def __init__(self, in_file, out_file, transform=None):
         self.input_frame = in_file
         self.label_frame = out_file
@@ -49,6 +51,7 @@ class BCdataset(Dataset):
 
 
 class Net(torch.nn.Module):
+    """Fully-connected network: 152 -> 304 -> 304 -> 304 -> 152."""
     def __init__(self,n_feature,n_hidden1,n_hidden2,n_hidden3,n_output):
         super(Net,self).__init__()
         self.hidden1 = torch.nn.Linear(n_feature,n_hidden1)
@@ -79,6 +82,7 @@ class Net(torch.nn.Module):
 
 
 def NN_train(train,test,lr,num_iterations):
+    """Train the network and save best weights and loss curves."""
     device          = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     base_path       = './False/Re100_100episode_False_42'
@@ -100,7 +104,7 @@ def NN_train(train,test,lr,num_iterations):
 
     train_loss_list = []
     test_loss_list  = []
-    best_test_loss  = float('inf')  # 初始化为正无穷
+    best_test_loss  = float('inf')
     best_model_wts  = None
 
     for epoch in range(num_iterations):
@@ -118,7 +122,7 @@ def NN_train(train,test,lr,num_iterations):
             loss.backward()
             optimizer.step()
 
-            train_loss_sum += loss.item() * inputs.size(0)  # 乘以batch样本数
+            train_loss_sum += loss.item() * inputs.size(0)
 
         # 测试阶段
         model.eval()
@@ -171,19 +175,19 @@ def NN_train(train,test,lr,num_iterations):
             f.write(f"{loss}\n")
 
 
-    # 保存最佳模型权重
     torch.save(best_model_wts, os.path.join(Path_to_weights, 'NN_weights.pth'))
     print(f"Best Test Loss: {best_test_loss:.4f}")
 
 
 def read_data():
+    """Load supervised training data from .npy files."""
     X = np.load('./False/X_100_data_Re100_False.npy')
     Y = np.load('./False/Y_100_data_Re100_False.npy')
 
     return X, Y
 
 def model_train():
-
+    """Entry point for training the supervised model."""
     inputs, labels = read_data()
 
     test_size      = 0.1
@@ -199,3 +203,11 @@ def model_train():
 
 if __name__ == "__main__":
     model_train()
+
+
+
+
+
+
+
+
