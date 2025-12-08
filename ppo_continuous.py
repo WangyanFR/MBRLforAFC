@@ -3,15 +3,25 @@ import torch.nn.functional as F
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 import torch.nn as nn
 from torch.distributions import Beta, Normal
+"""
+Implementation of PPO for continuous action spaces.
 
+Includes:
+- Actor_Beta:     Beta-distribution policy (actions in [0, 1]).
+- Actor_Gaussian: Gaussian policy with fixed log_std.
+- Critic:         value function network.
+- PPO_continuous: PPO training loop (policy + value updates).
+"""
 
 # Trick 8: orthogonal initialization
 def orthogonal_init(layer, gain=1.0):
+    """Apply orthogonal initialization to a linear layer."""
     nn.init.orthogonal_(layer.weight, gain=gain)
     nn.init.constant_(layer.bias, 0)
 
 
 class Actor_Beta(nn.Module):
+    """Policy network that outputs a Beta distribution."""
     def __init__(self, args):
         super(Actor_Beta, self).__init__()
         self.fc1 = nn.Linear(args.state_dim, args.hidden_width)
@@ -41,12 +51,14 @@ class Actor_Beta(nn.Module):
         return dist
 
     def mean(self, s):
+        """Return the mean of the Beta distribution."""
         alpha, beta = self.forward(s)
         mean = alpha / (alpha + beta)  # The mean of the beta distribution
         return mean
 
 
 class Actor_Gaussian(nn.Module):
+    """Policy network with Gaussian distribution outputs."""
     def __init__(self, args):
         super(Actor_Gaussian, self).__init__()
         self.max_action = args.max_action
@@ -65,6 +77,7 @@ class Actor_Gaussian(nn.Module):
     def forward(self, s):
         s = self.activate_func(self.fc1(s))
         s = self.activate_func(self.fc2(s))
+        # [-1, 1] -> [-max_action, max_action]
         mean = self.max_action * torch.tanh(self.mean_layer(s)) + self.max_action # [-1,1]->[-max_action,max_action]
         return mean
 
@@ -77,6 +90,7 @@ class Actor_Gaussian(nn.Module):
 
 
 class Critic(nn.Module):
+    """Value function approximator V(s)."""
     def __init__(self, args):
         super(Critic, self).__init__()
         self.fc1 = nn.Linear(args.state_dim, args.hidden_width)
@@ -98,6 +112,7 @@ class Critic(nn.Module):
 
 
 class PPO_continuous():
+    """PPO algorithm for continuous control."""
     def __init__(self, args):
         self.policy_dist = args.policy_dist
         self.max_action = args.max_action
@@ -116,6 +131,7 @@ class PPO_continuous():
         self.use_lr_decay = args.use_lr_decay
         self.use_adv_norm = args.use_adv_norm
 
+        # Build actor & critic
         if self.policy_dist == "Beta":
             self.actor = Actor_Beta(args)
         else:
@@ -129,7 +145,19 @@ class PPO_continuous():
             self.optimizer_actor = torch.optim.Adam(self.actor.parameters(), lr=self.lr_a)
             self.optimizer_critic = torch.optim.Adam(self.critic.parameters(), lr=self.lr_c)
 
+    # --------------------------------------------------------------------- #
+    # Acting
+    # --------------------------------------------------------------------- #
     def evaluate(self, s):  # When evaluating the policy, we only use the mean
+        """
+        Evaluate policy deterministically (for testing).
+
+        Args:
+            state (np.ndarray): environment state.
+
+        Returns:
+            np.ndarray: deterministic action (policy mean).
+        """
         s = torch.unsqueeze(torch.tensor(s, dtype=torch.float), 0)
         if self.policy_dist == "Beta":
             a = self.actor.mean(s).detach().numpy().flatten()
@@ -138,6 +166,13 @@ class PPO_continuous():
         return a
 
     def choose_action(self, s):
+        """
+        Sample action from current policy (for training).
+
+        Returns:
+            action (np.ndarray)
+            action_log_prob (np.ndarray)
+        """
         s = torch.unsqueeze(torch.tensor(s, dtype=torch.float), 0)
         if self.policy_dist == "Beta":
             with torch.no_grad():
@@ -152,7 +187,17 @@ class PPO_continuous():
                 a_logprob = dist.log_prob(a)  # The log probability density of the action
         return a.numpy().flatten(), a_logprob.numpy().flatten()
 
+    # --------------------------------------------------------------------- #
+    # Training
+    # --------------------------------------------------------------------- #
     def update(self, replay_buffer, total_steps):
+        """
+        Run PPO update using data from the replay buffer.
+
+        Args:
+            replay_buffer: on-policy buffer containing one batch of transitions.
+            total_steps (int): current total environment steps (for lr decay).
+        """
         s, a, a_logprob, r, s_, dw, done = replay_buffer.numpy_to_tensor()  # Get training data
         """
             Calculate the advantage using GAE
@@ -173,7 +218,9 @@ class PPO_continuous():
             if self.use_adv_norm:  # Trick 1:advantage normalization
                 adv = ((adv - adv.mean()) / (adv.std() + 1e-5))
 
-        # Optimize policy for K epochs:
+        # ------------------------------------------------------------------
+        # 2) Optimize policy for K epochs
+        # ------------------------------------------------------------------
         for _ in range(self.K_epochs):
             # Random sampling and no repetition. 'False' indicates that training will continue even if the number of samples in the last time is less than mini_batch_size
             for index in BatchSampler(SubsetRandomSampler(range(self.batch_size)), self.mini_batch_size, False):
@@ -206,6 +253,7 @@ class PPO_continuous():
             self.lr_decay(total_steps)
 
     def lr_decay(self, total_steps):
+        """Linearly decay learning rates based on total training steps."""
         lr_a_now = self.lr_a * (1 - total_steps / self.max_train_steps)
         lr_c_now = self.lr_c * (1 - total_steps / self.max_train_steps)
         for p in self.optimizer_actor.param_groups:
