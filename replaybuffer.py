@@ -1,9 +1,21 @@
 import torch
 import numpy as np
+"""
+Simple on-policy buffer for PPO.
 
+Stores one batch of transitions and then converts them to PyTorch tensors.
+"""
 
 class ReplayBuffer:
+    """On-policy rollout buffer for PPO."""
     def __init__(self, args):
+        """
+        Args:
+            args: argument namespace with at least:
+                  - batch_size
+                  - state_dim
+                  - action_dim
+        """
         self.s = np.zeros((args.batch_size, args.state_dim))
         self.a = np.zeros((args.batch_size, args.action_dim))
         self.a_logprob = np.zeros((args.batch_size, args.action_dim))
@@ -14,6 +26,7 @@ class ReplayBuffer:
         self.count = 0
 
     def store(self, s, a, a_logprob, r, s_, dw, done):
+        """Store a single transition into the buffer."""
         self.s[self.count] = s
         self.a[self.count] = a
         self.a_logprob[self.count] = a_logprob
@@ -24,6 +37,7 @@ class ReplayBuffer:
         self.count += 1
 
     def numpy_to_tensor(self):
+        """Return all stored data as PyTorch tensors."""
         s = torch.tensor(self.s, dtype=torch.float)
         a = torch.tensor(self.a, dtype=torch.float)
         a_logprob = torch.tensor(self.a_logprob, dtype=torch.float)
@@ -35,4 +49,5 @@ class ReplayBuffer:
         return s, a, a_logprob, r, s_, dw, done
 
     def get_action(self):
+        """Convenience function to access stored actions."""
         return self.a
