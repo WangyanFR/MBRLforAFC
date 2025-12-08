@@ -6,16 +6,24 @@ from normalization import Normalization, RewardScaling
 from replaybuffer import ReplayBuffer
 from ppo_continuous import PPO_continuous
 
+"""
+Main script for training PPO on the cylinder-flow environment.
+
+- Creates Gym environments.
+- Loads pre-trained actor/critic weights (if provided).
+- Runs on-policy rollouts and periodically updates PPO.
+"""
 
 def main(args, env_name, seed):
+    # Create training and evaluation environments
     env = gym.make(env_name)
     env_evaluate = gym.make(env_name)  # When evaluating the policy, we need to rebuild an environment
-    # Set random seed
+    # Set random seeds for reproducibility
     env.action_space.seed(seed)
     env_evaluate.action_space.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-
+    # Infer state and action dimensions from environment
     args.state_dim = env.observation_space.shape[0]
     args.action_dim = env.action_space.shape[0]
     args.max_action = 0.04
@@ -26,24 +34,24 @@ def main(args, env_name, seed):
     print("max_action={}".format(args.max_action))
     print("max_episode_steps={}".format(args.max_episode_steps))
 
-    evaluate_num = 0  # Record the number of evaluations
-    evaluate_rewards = []  # Record the rewards during the evaluating
-    total_steps = 6400  # Record the total steps during the training
-
+    # Bookkeeping
+    evaluate_num = 0  # number of evaluations (if used)
+    evaluate_rewards = []  # evaluation rewards storage
+    total_steps = 0     # starting step index (because we load weights)
+    # Initialize buffer and agent
     replay_buffer = ReplayBuffer(args)
     agent = PPO_continuous(args)
 
-    weight_path1 = './weight/actor_weights_step6400.pth'  # 设置正确的权重文件路径
-    weight_path2 = './weight/critic_weights_step6400.pth'  # 设置正确的权重文件路径
-    agent.actor.load_state_dict(torch.load(weight_path1))
-    agent.critic.load_state_dict(torch.load(weight_path2))
-
+    # Normalization utilities
     state_norm = Normalization(shape=args.state_dim)  # Trick 2:state normalization
     if args.use_reward_norm:  # Trick 3:reward normalization
         reward_norm = Normalization(shape=1)
     elif args.use_reward_scaling:  # Trick 4:reward scaling
         reward_scaling = RewardScaling(shape=1, gamma=args.gamma)
 
+    # ------------------------------------------------------------------ #
+    # Training loop
+    # ------------------------------------------------------------------ #
     while total_steps < args.max_train_steps:
         s = env.reset()
         if args.use_state_norm:
@@ -54,7 +62,10 @@ def main(args, env_name, seed):
         done = False
         while not done:
             episode_steps += 1
+            # Sample action from policy
             a, a_logprob = agent.choose_action(s)  # Action and the corresponding log probability
+
+            # Map Beta output [0, 1] to [0, max_action] if needed
             if args.policy_dist == "Beta":
                 action = a * args.max_action # [0,1]->[0,max]
             else:
@@ -84,10 +95,7 @@ def main(args, env_name, seed):
                 replay_buffer.count = 0
 
             if total_steps % args.save_freq == 0:
-                # np.save('./data_train/PPO_continuous_{}_env_{}__seed_{}.npy'.format(args.policy_dist, env_name, seed), np.array(evaluate_rewards))
-                # 保存Actor的权重
                 torch.save(agent.actor.state_dict(), './weight/actor_weights_step{}.pth'.format(total_steps))
-                # 保存Critic的权重
                 torch.save(agent.critic.state_dict(), './weight/critic_weights_step{}.pth'.format(total_steps))
 
 
@@ -124,5 +132,4 @@ if __name__ == '__main__':
 
     env_name = 'CylinderEnv2_False-v0'
     main(args, env_name=env_name, seed=10086)
-    # test(args, env_name=env_name, seed=12315)
 
