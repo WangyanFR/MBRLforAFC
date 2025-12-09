@@ -38,10 +38,75 @@ Main Python packages:
 - `ansys-fluent-core` (Python interface to Fluent)
 
 
+## 2. Code Structure
+### 2.1 File Overview
+
+| File                     | Description                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `normalization.py`       | Utilities for **running mean/std**, **state normalization** and **reward scaling** (e.g. `RunningMeanStd`, `Normalization`, `RewardScaling`) used to stabilize PPO training.                                             |
+| `replaybuffer.py`        | On-policy **replay buffer** for PPO, storing transitions `(s, a, logprob, r, s', dw, done)` and triggering updates when full.                                                                                            |
+| `ppo_continuous.py`      | Core **PPO implementation** for continuous action spaces, including: Actor (Beta / Gaussian policy), Critic (value network), GAE, entropy regularization, gradient clipping, learning-rate decay, etc.                   |
+| `CylinderEnv2_False.py`  | **Real CFD environment** built on ANSYS Fluent (2D cylinder flow control) with Gym-style `reset()` / `step()`; handles boundary conditions, Fluent runs, state extraction, and reward computation.                       |
+| `PPO_continuous_main.py` | Main training script for **MFRL**: runs PPO directly on the Fluent-based environment `CylinderEnv2`.                                                                                                                     |
+| `model_train.py`         | Trains a **neural network environment model** using Re = 1000 CFD data. Builds inputs `[state(151), action(1)]` and labels `[reward(1), delta_state(151)]`, and provides `NN_pred()` to predict `[reward, delta_state]`. |
+| `FakeEnv.py`             | Wraps `NN_pred()` into a **virtual environment** (`FakeEnv`) with Gym-like interface (`reset`, `step`) for **MBRL / MBTT** training.                                                                                     |
+| `model_train_Re100.py`   | Trains / fine-tunes a **Re = 100** environment model using Re = 100 dataset (e.g. `.npy` files), for **transfer learning (MBTT)**.                                                                                       |
+
+### 2.2 Conceptual Data Flow
+
+Real CFD (Fluent)
+    │
+    ├─► MFRL: PPO_continuous_main.py + CylinderEnv2_False.py
+    │
+Offline CFD Data (Re=1000 / Re=100)
+    │
+    ├─► model_train.py           (Re=1000 model)
+    ├─► model_train_Re100.py     (Re=100 model / fine-tuning)
+    │
+    └─► NN_pred()  ─► FakeEnv.py ─► PPO (MBRL / MBTT)
+
+
+## MBRL – Model-Based Reinforcement Learning
+
+In MBRL, we first learn a surrogate NN model of the environment from CFD data, then train PPO on this model using FakeEnv. This is much faster than MFRL since it avoids calling Fluent at every step.
+
+MBRL has two stages:
+
+Offline model training from CFD data (e.g. Re = 1000)
+
+Online PPO training on the learned model (FakeEnv)
+
+### Stage 1 – Train the NN Environment Model (Re = 1000)
+
+Prepare a dataset folder, e.g.:
+
+./Re1000data/
+    flowfield/episode_*.csv
+    cdcl.csv
+    (other required files)
+
+### Stage 2 – PPO on the Learned Model (FakeEnv)
+
+FakeEnv.py uses NN_pred to build a virtual environment:
 
 
 
+## Citation
 
-CylinderEnv2_False.py is an environment (Env) that I added in the gym environment.
+If you use this code for academic work, please cite the corresponding paper (example):
 
-If you have any other questions, contact the author at 1713241498@qq.com.
+@article{your_paper_2025,
+  title   = {},
+  author  = {},
+  journal = {},
+  year    = {2025}
+}
+
+## Contact
+
+For questions, bug reports, or collaboration:
+
+Open an issue in this repository, or
+
+Contact:  1713241498@qq.com / 1022201147@tju.edu.cn
+
