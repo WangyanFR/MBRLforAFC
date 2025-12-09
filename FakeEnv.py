@@ -19,7 +19,7 @@ class FakeEnv():
             self.episode_number += 1
         else:
             self.episode_number += 1
-            next_state = np.loadtxt('./Re1000_initial_flowfield.txt')
+            next_state = np.loadtxt('./Re100_initial_flowfield.txt')
 
         return next_state
 
@@ -40,6 +40,7 @@ class FakeEnv():
 
     def seed(self,seed):
         return None
+
 
 
 
