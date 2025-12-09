@@ -65,6 +65,10 @@ Offline CFD Data (Re=1000 / Re=100)
     │
     └─► NN_pred()  ─► FakeEnv.py ─► PPO (MBRL / MBTT)
 
+## MFRL – Model-Free Reinforcement Learning
+
+In MFRL, PPO interacts directly with the real CFD environment. This is the most physically accurate but also the most expensive training mode (since Fluent must run for each step).
+
 
 ## MBRL – Model-Based Reinforcement Learning
 
