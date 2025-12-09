@@ -1,20 +1,41 @@
 # MBRLforAFC
-Flow Control via PPO: MFRL / MBRL / MBTT
+# Flow Control with PPO: MFRL, MBRL and MBTT
 
-This project implements flow field control based on reinforcement learning (RL) methods, including:
+This repository implements **reinforcement learning–based flow control** using Proximal Policy Optimization (PPO) in three flavors:
 
-MFRL (Model-Free Reinforcement Learning) - Interact directly with the Fluent real environment;
+- **MFRL** – Model-Free Reinforcement Learning
+PPO interacts directly with an ANSYS Fluent–based CFD environment.
 
-MBRL (Model-based Reinforcement Learning) - First train the neural network environment Model with data, and then train it in a virtual environment;
+- **MBRL** – Model-Based Reinforcement Learning
+A neural network surrogate model of the environment is trained from CFD data and then used as a fast “virtual environment”.
 
-MBTT (Model-Based Two-Task/Transfer) - Model-based reinforcement learning that transfers between different Reynolds numbers (Re=100, Re=1000).
+- **MBTT** – Model-Based Two-Task / Transfer Training
+A model trained at one Reynolds number (e.g. Re=1000) is adapted to another (e.g. Re=100) and then used for RL.
 
+---
 
-Environmental Requirements (Environment)
-Operating system Windows 10/11 (ANSYS Fluent needs to be installed)
-Python versions 3.8 to 3.10
-It is recommended to use NVIDIA GPU (optional).
-Dependent libraries: numpy, pandas, matplotlib, scikit-learn, torch, gym, ansys-fluent core
+## 1.  Environment & Dependencies
+
+### 1.1 System Requirements
+
+- **OS**: Windows 10 / 11
+- **Python**: 3.8 – 3.10 (recommended)
+- **CFD Solver**: ANSYS Fluent (licensed and callable from Python)
+- **Hardware**:
+- CPU: multi-core recommended
+- GPU: NVIDIA GPU recommended (for faster NN training, optional)
+
+### 1.2 Python Dependencies
+
+Main Python packages:
+
+- `numpy`
+- `pandas`
+- `matplotlib`
+- `scikit-learn`
+- `torch` (PyTorch)
+- `gym`
+- `ansys-fluent-core` (Python interface to Fluent)
 
 
 
