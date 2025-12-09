@@ -13,7 +13,7 @@ class FakeEnv():
             chance = random.random()
             probability_hard_reset = 0.2
             if chance < probability_hard_reset:
-                next_state = np.loadtxt('./Re1000_initial_flowfield.txt')
+                next_state = np.loadtxt('./Re100_initial_flowfield.txt')
             else:
                 next_state = self.next_state
             self.episode_number += 1
@@ -40,6 +40,7 @@ class FakeEnv():
 
     def seed(self,seed):
         return None
+
 
 
 
